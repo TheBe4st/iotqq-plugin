@@ -1,0 +1,6 @@
+.idea
+global/config.go
+.vscode
+resource
+global/config
+__debug_bin

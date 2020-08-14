@@ -122,7 +122,14 @@ func (th Message) GetSendUserId() int64 {
 func (th Message) GetSendUserNickName() string {
 	return th.CurrentPacket.Data.FromNickName
 }
-
+func (th Message) GetAtInfo() (error,AtInfo) {
+	atInfo := AtInfo{}
+	if err := json.Unmarshal([]byte(th.CurrentPacket.Data.Content),&atInfo); err != nil {
+		log.Fatal(err)
+		return err, atInfo
+	}
+	return nil,atInfo
+}
 func Zan(qq1 int, err error) {
 	//名片点赞
 	tmp := make(map[string]interface{})

@@ -1,7 +1,6 @@
 package strategy
 
 import (
-	"encoding/json"
 	"fmt"
 	"log"
 	"math"
@@ -10,6 +9,71 @@ import (
 	"strings"
 	"time"
 )
+
+type Key struct {
+	Key1 string
+	Key2 string
+}
+
+var keys = []Key{
+	{"灌汤包","小笼包"},
+	{"酷我音乐","酷狗音乐"},
+	{"薰衣草","满天星bai"},
+	{"富二代","高富帅"},
+	{"生活费","零花钱"},
+	{"麦克风","扩音器"},
+	{"郭德纲","周立波"},
+	{"图书馆","图书店"},
+	{"男朋友","前男友"},
+	{"洗衣粉","皂角粉"},
+	{"牛肉干","猪肉脯"},
+	{"泡泡糖","棒棒糖"},
+	{"小沈阳","宋小宝"},
+	{"张韶涵","王心凌"},
+	{"刘诗诗","刘亦菲"},
+	{"甄嬛传","红楼梦"},
+	{"甄子丹","李连杰"},
+	{"包青天","狄仁杰"},
+	{"大白兔","金丝猴"},
+	{"果粒橙","鲜橙多"},
+	{"沐浴露","沐浴盐"},
+	{"洗发露","护发素"},
+	{"自行车","电动车"},
+	{"班主任","辅导员"},
+	{"过山车","碰碰车"},
+	{"铁观音","碧螺春"},
+	{"丑小鸭","灰姑娘"},
+	{"十面埋伏","四面楚歌"},
+	{"成吉思汗","努尔哈赤"},
+	{"谢娜张杰","邓超孙俪"},
+	{"福尔摩斯","工藤新一"},
+	{"贵妃醉酒","黛玉葬花"},
+	{"流星花园","花样男子"},
+	{"神雕侠侣","天龙八部"},
+	{"天天向上","非诚勿扰"},
+	{"勇往直前","全力以赴"},
+	{"鱼香肉丝","四喜丸子"},
+	{"语无伦次","词不达意"},
+	{"鼠目寸光","井底之蛙"},
+	{"近视眼镜","隐形眼镜"},
+	{"美人心计","倾世皇妃"},
+	{"夏家三千金","爱情睡醒了"},
+	{"降龙十八掌","九阴白骨爪"},
+	{"红烧牛肉面","香辣牛肉面"},
+	{"江南style","最炫民族风"},
+	{"脚踏车","自行车"},
+	{"口香糖","木糖醇"},
+	{"老佛爷","老天爷"},
+	{"金丝猴","大白兔(奶糖)"},
+	{"近视眼镜","隐形眼镜"},
+	{"两小无猜","青梅竹马"},
+	{"龙凤呈祥","鸳鸯戏水"},
+	{"麻婆豆腐","皮蛋豆腐"},
+	{"江南style","最炫民族风"},
+	{"降龙十八掌","九阴白骨爪"},
+	{"福尔摩斯-工藤新","福尔摩斯-柯南"},
+	{"梁山伯与祝英台","罗密欧与朱丽叶"},
+}
 
 const VOTE_INVALID = -1
 
@@ -26,7 +90,7 @@ const SPEAK_TIME = 20 * time.Second
 const VOTE_TIME = 15 * time.Second
 
 const MAX_PLAYER = 8
-const MIN_PLAYER = 2
+const MIN_PLAYER = 6
 
 var games map[int64]*Game
 
@@ -46,13 +110,14 @@ type Player struct {
 	NickName  string
 	IsSpy     bool // 这货是不是个卧底
 	IsOut     bool // 这货是不是出局了
-	VoteEntry []*Vote
+	VoteEntry [100]*Vote
 	SpeakChannel chan time.Time
 	PlayerStatus int
+	VoteCount [100]int  //每轮得票数
 }
 type Vote struct {
-	ToUserQQ   int64
-	FromUserQQ int64
+	ToUserQQ   *Player
+	FromUserQQ *Player
 }
 
 func init() {
@@ -111,12 +176,20 @@ func BeginGame(args iotqq.Message) {
 	game.GameStatus = GAME_RUNNING
 
 	// 从词库抓一个词
-	game.NormalWord = "爬山"
-	game.SpyWord = "攀岩"
-
+	rand.Seed(time.Now().UnixNano())
+	{
+		a := rand.Intn(len(keys))
+		b :=rand.Intn(10)
+		if b > 5 {
+			game.NormalWord = keys[a].Key1
+			game.SpyWord = keys[a].Key2
+		} else {
+			game.NormalWord = keys[a].Key2
+			game.SpyWord = keys[a].Key1
+		}
+	}
 	// 随机挑选 spyNum 个幸运儿当作卧底
 	spyNum := int(math.Floor(float64(len(game.Players) / MIN_PLAYER)))
-	rand.Seed(time.Now().UnixNano())
 	for len(game.Spy) < spyNum {
 		r := rand.Intn(len(game.Players))
 		luckDog := game.Players[r]
@@ -181,7 +254,10 @@ func wheel(args iotqq.Message) {
 		BeginVote(args)
 		<- game.VoteChan
 		EndVote(args)
-		CheckGame(args)
+		if game.IsDone() {
+			EndGame(args)
+			return
+		}
 		game.Wheel += 1
 	}
 }
@@ -266,17 +342,10 @@ func JoinGame(args iotqq.Message) {
 			NickName:  args.GetSendUserNickName(),
 			IsSpy:     false,
 			IsOut:     false,
-			VoteEntry: make([]*Vote, 0),
 			SpeakChannel: make(chan time.Time),
 		})
 		Sender.SendToGroup(args.GetGroupId(), fmt.Sprintf("%s 成功加入房间，正在等待玩家加入,当前玩家数量：%d %s", args.GetSendUserNickName(), len(game.Players), genPlayerList(game)), args)
 	}
-}
-
-func CheckGame(args iotqq.Message) {
-	game := getCurrentGame(args)
-	// 检查用户的投票情况 返回投票
-	print(game)
 }
 
 func EndGame(args iotqq.Message) {
@@ -326,41 +395,106 @@ func DoVote(args iotqq.Message) {
     if game == nil {
 		return
 	}
-	message := args.CurrentPacket.Data.Content
 	//判断 游戏的状态
-	atInfo := iotqq.AtInfo{}
-	if err := json.Unmarshal([]byte(message),&atInfo); err != nil {
-		log.Fatal(err)
-		Sender.SendToGroup(args.GetGroupId(),fmt.Sprintf("因为内部错误， %s 的投票失败了",args.GetSendUserNickName()),args)
+	if game.GameStatus != GAME_VOTEING {
+		log.Print(fmt.Sprintf("投票发起人：%s不是游戏状态不能投票！",args.GetSendUserNickName()))
 		return
 	}
-
+	err,atInfo := args.GetAtInfo()
+	if err != nil {
+		return
+	}
+	from := game.FindPlayerByQQ(args.GetSendUserId())
+	to := game.FindPlayerByQQ(atInfo.UserID[0])
+	// 校验一下 双方必须都是玩家才阔以
+	if from == nil || to == nil{
+		log.Print("无效的投票，双方不是玩家！")
+		return
+	}
 	// 生成一条投票纪录 放进 投票者的 vote里
 	vote := &Vote{
-		ToUserQQ:   atInfo.UserID[0],
-		FromUserQQ: args.GetSendUserId(),
+		ToUserQQ:   to,
+		FromUserQQ: from,
 	}
-	from := game.FindPlayerByQQ(vote.FromUserQQ)
-	to := game.FindPlayerByQQ(vote.ToUserQQ)
+	from.VoteEntry[game.Wheel] = vote
+	Sender.SendToGroup(args.GetGroupId(),fmt.Sprintf("%s 投票给了 %s ~",args.GetSendUserNickName(),vote.ToUserQQ.NickName),args)
+}
 
-	// 校验一下 双方必须都是玩家才阔以
-	if from == nil {
-		Sender.SendToGroup(args.GetGroupId(),fmt.Sprintf("%s 不是游戏的参与者哦 ~",from.NickName),args)
-		return
+func (th *Game) IsDone() bool {
+	// 检查用户的投票情况 返回投票
+	ret := true
+	for _, player := range th.Players {
+		if !player.IsOut && !player.IsSpy{
+			ret = false
+			break
+		}
 	}
-	if to == nil {
-		Sender.SendToGroup(args.GetGroupId(),fmt.Sprintf("%s 不是游戏的参与者哦 ~",to.NickName),args)
-		return
-	}
-	player := game.FindPlayerByQQ(vote.FromUserQQ)
-	player.VoteEntry = append(player.VoteEntry,vote)
-	Sender.SendToGroup(args.GetGroupId(),fmt.Sprintf("%s 投票给了 %s ~",args.GetSendUserNickName(),game.FindPlayerByQQ(vote.ToUserQQ).NickName),args)
+	return ret
 }
 
 func EndVote(args iotqq.Message) {
 	Sender.SendToGroup(args.GetGroupId(),fmt.Sprintf("投票结束~正在进行整理得票情况..."),args)
 	game := getCurrentGame(args)
 	game.GameStatus = GAME_RUNNING
+
+	count := make(map[*Player][]*Player)
+	// TODO： 把该死的玩家给弄死
+	for _, player := range game.Players {
+		vote := player.VoteEntry[game.Wheel]
+		if vote == nil {
+			continue
+		}
+		if count[vote.ToUserQQ] == nil {
+			count[vote.ToUserQQ] = make([]*Player,0)
+		}
+		count[vote.ToUserQQ] = append(count[vote.ToUserQQ],vote.FromUserQQ)
+	}
+
+	// 计算玩家们的本轮得票数
+	for k, v := range count {
+		k.VoteCount[game.Wheel] = len(v)
+	}
+
+	// 找出最大的得票数
+	var max *Player = nil
+	for _, player := range game.Players {
+		if player.VoteCount[game.Wheel] > 0 {
+			if max == nil {
+				max = player
+			} else if player.VoteCount[game.Wheel] > max.VoteCount[game.Wheel] {
+				max = player
+			}
+		}
+	}
+
+	//生成投票结果文本
+	str := "投票结果：\n"
+	for to, from := range count {
+		for _, item := range from {
+			str += item.NickName + ","
+		}
+		str += "投给了 "
+		str += to.NickName
+		str += "\n"
+	}
+	Sender.SendToGroup(args.GetGroupId(),str,args)
+	time.Sleep(time.Second)
+	if max == nil {
+		Sender.SendToGroup(args.GetGroupId(),"无人投票，无人出局",args)
+	} else {
+		// 找找有没有平票的 qwq
+		for _, player := range game.Players {
+			if player.VoteCount[game.Wheel] == max.VoteCount[game.Wheel] {
+				// 出现平票 各自安好
+				Sender.SendToGroup(args.GetGroupId(),fmt.Sprintf("%s 和 %s 平票！无人出局",player.NickName,max.NickName),args)
+				return
+			}
+		}
+		// 木的平票的 死了
+		max.IsOut = true
+	}
+	time.Sleep(time.Second)
+	Sender.SendToGroup(args.GetGroupId(),genLivePlayer(game),args)
 }
 func UnSupportOperator(args iotqq.Message) {
 }
@@ -388,9 +522,30 @@ func genPlayerListWithSpy(game *Game, withSpy bool) string {
 			} else {
 				strIsSpy = "平民"
 			}
-			ret += fmt.Sprintf("%d、 %s 身份： %s\n", i, players[i].NickName, strIsSpy)
+
+			strIsOut := ""
+			if players[i].IsOut {
+				strIsOut = "否"
+			} else {
+				strIsOut = "是"
+			}
+			ret += fmt.Sprintf("%d、 %s 身份： %s 存活：%s\n", i, players[i].NickName, strIsSpy,strIsOut)
 		} else {
 			ret += fmt.Sprintf("%d、 %s\n", i, players[i].NickName)
+		}
+	}
+	return ret
+}
+
+func genLivePlayer(game *Game) string{
+	if game == nil {
+		return ""
+	}
+	ret := "场上剩余:\n"
+	players := game.Players
+	for i := 0; i < len(players); i++ {
+		if !players[i].IsOut {
+			ret	+= fmt.Sprintf("%d、 %s\n", i, players[i].NickName)
 		}
 	}
 	return ret

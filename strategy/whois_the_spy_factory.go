@@ -559,9 +559,9 @@ func genPlayerListWithSpy(game *Game, withSpy bool) string {
 			} else {
 				strIsOut = "是"
 			}
-			ret += fmt.Sprintf("%d、 %s 身份： %s 存活：%s\n", i, players[i].NickName, strIsSpy,strIsOut)
+			ret += fmt.Sprintf("%d、 %s 身份： %s 存活：%s\n", i + 1, players[i].NickName, strIsSpy,strIsOut)
 		} else {
-			ret += fmt.Sprintf("%d、 %s\n", i, players[i].NickName)
+			ret += fmt.Sprintf("%d、 %s\n", i + 1, players[i].NickName)
 		}
 	}
 	return ret
@@ -575,7 +575,7 @@ func genLivePlayer(game *Game) string{
 	players := game.Players
 	for i := 0; i < len(players); i++ {
 		if !players[i].IsOut {
-			ret	+= fmt.Sprintf("%d、 %s\n", i, players[i].NickName)
+			ret	+= fmt.Sprintf("%d、 %s\n", i + 1, players[i].NickName)
 		}
 	}
 	return ret

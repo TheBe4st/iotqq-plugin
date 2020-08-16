@@ -86,8 +86,8 @@ const PLAYER_CREATE = 0
 const PLAYER_SPEAKING = 1
 
 
-const SPEAK_TIME = 20 * time.Second
-const VOTE_TIME = 15 * time.Second
+const SPEAK_TIME = 20 *2 * time.Second
+const VOTE_TIME = 15 * 2 * time.Second
 
 const MAX_PLAYER = 8
 const MIN_PLAYER = 6
@@ -227,7 +227,7 @@ func BeginGame(args iotqq.Message) {
 func wheel(args iotqq.Message) {
 	game := getCurrentGame(args)
 	for true {
-		if game.GameStatus == GAME_END {
+		if game == nil || game.GameStatus == GAME_END {
 			return
 		}
 		for _, item := range game.Players {
@@ -353,6 +353,7 @@ func EndGame(args iotqq.Message) {
 	// 此处仅仅释放掉当前的游戏房间 并打印游戏结果
 	groupId := args.GetGroupId()
 	game := getCurrentGame(args)
+	game.GameStatus = GAME_END
 	games[groupId] = nil
 	if game == nil {
 		return //说明游戏已经结束或者压根没开始
@@ -376,7 +377,7 @@ func PrivateTest(args iotqq.Message) {
 }
 func BeginVote(args iotqq.Message) {
 	game := getCurrentGame(args)
-	if game.GameStatus == GAME_VOTEING {
+	if game.GameStatus == GAME_VOTEING || game.GameStatus == GAME_END {
 		return
 	}
 	game.GameStatus = GAME_VOTEING
@@ -435,6 +436,9 @@ func (th *Game) IsDone() bool {
 func EndVote(args iotqq.Message) {
 	Sender.SendToGroup(args.GetGroupId(),fmt.Sprintf("投票结束~正在进行整理得票情况..."),args)
 	game := getCurrentGame(args)
+	if game.GameStatus == GAME_END {
+		return
+	}
 	game.GameStatus = GAME_RUNNING
 
 	count := make(map[*Player][]*Player)
@@ -484,6 +488,12 @@ func EndVote(args iotqq.Message) {
 	} else {
 		// 找找有没有平票的 qwq
 		for _, player := range game.Players {
+
+			//跳过自己本身
+			if player == max {
+				continue
+			}
+
 			if player.VoteCount[game.Wheel] == max.VoteCount[game.Wheel] {
 				// 出现平票 各自安好
 				Sender.SendToGroup(args.GetGroupId(),fmt.Sprintf("%s 和 %s 平票！无人出局",player.NickName,max.NickName),args)

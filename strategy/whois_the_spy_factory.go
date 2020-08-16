@@ -166,6 +166,10 @@ func WhoIsTheSpyMsgFactory(tp string) IGroupMsgExecutor {
 
 func BeginGame(args iotqq.Message) {
 	game := getCurrentGame(args)
+	if game == nil {
+		CreateGame(args)
+		return
+	}
 	if game.GameStatus >= GAME_RUNNING {
 		return
 	}

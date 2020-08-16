@@ -229,8 +229,8 @@ func BeginGame(args iotqq.Message) {
 }
 
 func wheel(args iotqq.Message) {
-	game := getCurrentGame(args)
 	for true {
+		game := getCurrentGame(args)
 		if game == nil || game.GameStatus == GAME_END {
 			return
 		}

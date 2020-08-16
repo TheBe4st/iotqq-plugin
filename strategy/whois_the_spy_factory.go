@@ -361,11 +361,11 @@ func EndGame(args iotqq.Message) {
 	// 此处仅仅释放掉当前的游戏房间 并打印游戏结果
 	groupId := args.GetGroupId()
 	game := getCurrentGame(args)
-	game.GameStatus = GAME_END
-	games[groupId] = nil
 	if game == nil {
 		return //说明游戏已经结束或者压根没开始
 	}
+	game.GameStatus = GAME_END
+	games[groupId] = nil
 	Sender.SendToGroup(groupId, fmt.Sprintf("游戏已结束，卧底关键词：%s，平民关键词：%s，玩家身份信息：%s", game.SpyWord, game.NormalWord, genPlayerListWithSpy(game, true)), args)
 }
 

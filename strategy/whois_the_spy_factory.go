@@ -235,6 +235,10 @@ func wheel(args iotqq.Message) {
 			return
 		}
 		for _, item := range game.Players {
+			game := getCurrentGame(args)
+			if game == nil || game.GameStatus == GAME_END {
+				return
+			}
 			if item.IsOut {
 				continue
 			}

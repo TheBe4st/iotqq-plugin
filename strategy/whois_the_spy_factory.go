@@ -377,7 +377,7 @@ func PrivateTest(args iotqq.Message) {
 }
 func BeginVote(args iotqq.Message) {
 	game := getCurrentGame(args)
-	if game.GameStatus == GAME_VOTEING || game.GameStatus == GAME_END {
+	if game == nil || game.GameStatus == GAME_VOTEING || game.GameStatus == GAME_END {
 		return
 	}
 	game.GameStatus = GAME_VOTEING
@@ -422,6 +422,10 @@ func DoVote(args iotqq.Message) {
 }
 
 func (th *Game) IsDone() bool {
+
+	if th.GameStatus == GAME_END {
+		return true
+	}
 	// 检查用户的投票情况 返回投票
 	ret := true
 	for _, player := range th.Players {

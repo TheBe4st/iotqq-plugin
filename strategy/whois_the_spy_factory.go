@@ -442,7 +442,7 @@ func EndVote(args iotqq.Message) {
 	game.GameStatus = GAME_RUNNING
 
 	count := make(map[*Player][]*Player)
-	// TODO： 把该死的玩家给弄死
+	// 把该死的玩家给弄死
 	for _, player := range game.Players {
 		vote := player.VoteEntry[game.Wheel]
 		if vote == nil {
@@ -502,6 +502,14 @@ func EndVote(args iotqq.Message) {
 		}
 		// 木的平票的 死了
 		max.IsOut = true
+		// 把死了的身份爆出来
+		temp := ""
+		if max.IsSpy {
+			temp = "卧底"
+		} else {
+			temp = "平民"
+		}
+		Sender.SendToGroup(args.GetGroupId(),fmt.Sprintf("%s 死了，他的身份是 %s",max.NickName,temp),args)
 	}
 	time.Sleep(time.Second)
 	Sender.SendToGroup(args.GetGroupId(),genLivePlayer(game),args)
